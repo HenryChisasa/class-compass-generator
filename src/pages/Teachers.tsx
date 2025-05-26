@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -20,8 +19,15 @@ interface Teacher {
   employee_id: string;
 }
 
+interface UserProfile {
+  id: string;
+  school_id: string;
+  full_name: string;
+}
+
 const Teachers = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -42,6 +48,26 @@ const Teachers = () => {
         return;
       }
       setUser(user);
+
+      // Get user profile with school_id
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        toast.error('Failed to fetch user profile');
+        return;
+      }
+
+      if (!profileData?.school_id) {
+        toast.error('No school associated with your account. Please contact support.');
+        return;
+      }
+
+      setProfile(profileData);
       await fetchTeachers();
     };
     getUser();
@@ -66,7 +92,17 @@ const Teachers = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!profile?.school_id) {
+      toast.error('No school ID found');
+      return;
+    }
+
     try {
+      const dataToInsert = {
+        ...formData,
+        school_id: profile.school_id
+      };
+
       if (editingTeacher) {
         const { error } = await supabase
           .from('teachers')
@@ -78,7 +114,7 @@ const Teachers = () => {
       } else {
         const { error } = await supabase
           .from('teachers')
-          .insert([formData]);
+          .insert([dataToInsert]);
         
         if (error) throw error;
         toast.success('Teacher created successfully');

@@ -19,8 +19,15 @@ interface TimetableData {
   classrooms: any[];
 }
 
+interface UserProfile {
+  id: string;
+  school_id: string;
+  full_name: string;
+}
+
 const TimetableGenerator = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [timetableData, setTimetableData] = useState<TimetableData>({
@@ -40,7 +47,7 @@ const TimetableGenerator = () => {
   });
   const navigate = useNavigate();
 
-  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
   const periods = Array.from({ length: timetableSettings.periods_per_day }, (_, i) => i + 1);
 
   useEffect(() => {
@@ -51,6 +58,26 @@ const TimetableGenerator = () => {
         return;
       }
       setUser(user);
+
+      // Get user profile with school_id
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        toast.error('Failed to fetch user profile');
+        return;
+      }
+
+      if (!profileData?.school_id) {
+        toast.error('No school associated with your account. Please contact support.');
+        return;
+      }
+
+      setProfile(profileData);
       await fetchData();
     };
     getUser();
@@ -85,6 +112,11 @@ const TimetableGenerator = () => {
       return;
     }
 
+    if (!profile?.school_id) {
+      toast.error('No school ID found');
+      return;
+    }
+
     if (timetableData.subjects.length === 0 || timetableData.classes.length === 0 || timetableData.teachers.length === 0) {
       toast.error('Please add subjects, classes, and teachers before generating a timetable');
       return;
@@ -93,12 +125,15 @@ const TimetableGenerator = () => {
     setGenerating(true);
     try {
       // Create timetable record
+      const timetableDataToInsert = {
+        ...timetableSettings,
+        school_id: profile.school_id,
+        is_active: true
+      };
+
       const { data: timetable, error: timetableError } = await supabase
         .from('timetables')
-        .insert([{
-          ...timetableSettings,
-          is_active: true
-        }])
+        .insert([timetableDataToInsert])
         .select()
         .single();
 
@@ -114,12 +149,15 @@ const TimetableGenerator = () => {
         for (let period = 1; period <= timetableSettings.periods_per_day; period++) {
           for (const classItem of timetableData.classes) {
             // Create a lesson
+            const lessonDataToInsert = {
+              name: `${timetableData.subjects[subjectIndex % timetableData.subjects.length]?.name || 'Subject'} - ${classItem.name}`,
+              duration_periods: 1,
+              school_id: profile.school_id
+            };
+
             const { data: lesson, error: lessonError } = await supabase
               .from('lessons')
-              .insert([{
-                name: `${timetableData.subjects[subjectIndex % timetableData.subjects.length]?.name || 'Subject'} - ${classItem.name}`,
-                duration_periods: 1
-              }])
+              .insert([lessonDataToInsert])
               .select()
               .single();
 
