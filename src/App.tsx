@@ -7,6 +7,10 @@ import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
 import Dashboard from '@/pages/Dashboard';
+import Subjects from '@/pages/Subjects';
+import Classes from '@/pages/Classes';
+import Teachers from '@/pages/Teachers';
+import TimetableGenerator from '@/pages/TimetableGenerator';
 import './App.css';
 
 const queryClient = new QueryClient();
@@ -19,6 +23,10 @@ function App() {
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/subjects" element={<Subjects />} />
+          <Route path="/classes" element={<Classes />} />
+          <Route path="/teachers" element={<Teachers />} />
+          <Route path="/timetable-generator" element={<TimetableGenerator />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster />

@@ -20,6 +20,12 @@ import { toast } from 'sonner';
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [stats, setStats] = useState({
+    subjects: 0,
+    classes: 0,
+    teachers: 0,
+    classrooms: 0
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,6 +48,9 @@ const Dashboard = () => {
         .single();
 
       setProfile(profile);
+
+      // Get stats
+      await fetchStats();
     };
 
     getUser();
@@ -56,23 +65,43 @@ const Dashboard = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const fetchStats = async () => {
+    try {
+      const [subjectsRes, classesRes, teachersRes, classroomsRes] = await Promise.all([
+        supabase.from('subjects').select('id', { count: 'exact', head: true }),
+        supabase.from('classes').select('id', { count: 'exact', head: true }),
+        supabase.from('teachers').select('id', { count: 'exact', head: true }),
+        supabase.from('classrooms').select('id', { count: 'exact', head: true })
+      ]);
+
+      setStats({
+        subjects: subjectsRes.count || 0,
+        classes: classesRes.count || 0,
+        teachers: teachersRes.count || 0,
+        classrooms: classroomsRes.count || 0
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast.success('Signed out successfully');
   };
 
-  const stats = [
-    { label: 'Subjects', value: '0', icon: BookOpen, color: 'bg-blue-500' },
-    { label: 'Classes', value: '0', icon: GraduationCap, color: 'bg-green-500' },
-    { label: 'Teachers', value: '0', icon: Users, color: 'bg-purple-500' },
-    { label: 'Classrooms', value: '0', icon: MapPin, color: 'bg-orange-500' },
+  const statsData = [
+    { label: 'Subjects', value: stats.subjects.toString(), icon: BookOpen, color: 'bg-blue-500', action: () => navigate('/subjects') },
+    { label: 'Classes', value: stats.classes.toString(), icon: GraduationCap, color: 'bg-green-500', action: () => navigate('/classes') },
+    { label: 'Teachers', value: stats.teachers.toString(), icon: Users, color: 'bg-purple-500', action: () => navigate('/teachers') },
+    { label: 'Classrooms', value: stats.classrooms.toString(), icon: MapPin, color: 'bg-orange-500', action: () => console.log('Add Classroom') },
   ];
 
   const quickActions = [
-    { label: 'Add Subject', icon: BookOpen, action: () => console.log('Add Subject') },
-    { label: 'Add Class', icon: GraduationCap, action: () => console.log('Add Class') },
-    { label: 'Add Teacher', icon: Users, action: () => console.log('Add Teacher') },
-    { label: 'Generate Timetable', icon: Calendar, action: () => console.log('Generate Timetable') },
+    { label: 'Add Subject', icon: BookOpen, action: () => navigate('/subjects') },
+    { label: 'Add Class', icon: GraduationCap, action: () => navigate('/classes') },
+    { label: 'Add Teacher', icon: Users, action: () => navigate('/teachers') },
+    { label: 'Generate Timetable', icon: Calendar, action: () => navigate('/timetable-generator') },
   ];
 
   if (!user) {
@@ -123,8 +152,12 @@ const Dashboard = () => {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
-            <div key={index} className="bg-white rounded-lg shadow p-6">
+          {statsData.map((stat, index) => (
+            <div 
+              key={index} 
+              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={stat.action}
+            >
               <div className="flex items-center">
                 <div className={`${stat.color} rounded-lg p-3 mr-4`}>
                   <stat.icon className="w-6 h-6 text-white" />
