@@ -20,7 +20,18 @@ const Auth = () => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        navigate('/dashboard');
+        // Check if user has a school assigned
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('school_id')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.school_id) {
+          navigate('/dashboard');
+        } else {
+          navigate('/school-selection');
+        }
       }
     };
     checkUser();
@@ -40,8 +51,20 @@ const Auth = () => {
         if (error) throw error;
 
         if (data.user) {
+          // Check if user has a school assigned
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('school_id')
+            .eq('id', data.user.id)
+            .single();
+
           toast.success('Signed in successfully!');
-          navigate('/dashboard');
+          
+          if (profile?.school_id) {
+            navigate('/dashboard');
+          } else {
+            navigate('/school-selection');
+          }
         }
       } else {
         const { data, error } = await supabase.auth.signUp({
@@ -58,7 +81,13 @@ const Auth = () => {
 
         if (data.user) {
           toast.success('Account created successfully! Please check your email to confirm your account.');
-          setIsLogin(true);
+          
+          // For new signups, always redirect to school selection after email confirmation
+          if (data.user.email_confirmed_at) {
+            navigate('/school-selection');
+          } else {
+            setIsLogin(true);
+          }
         }
       }
     } catch (error: any) {

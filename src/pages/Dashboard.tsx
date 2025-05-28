@@ -47,9 +47,12 @@ const Dashboard = () => {
         .eq('id', user.id)
         .single();
 
-      setProfile(profile);
+      if (!profile?.school_id) {
+        navigate('/school-selection');
+        return;
+      }
 
-      // Get stats
+      setProfile(profile);
       await fetchStats();
     };
 
@@ -104,7 +107,7 @@ const Dashboard = () => {
     { label: 'Generate Timetable', icon: Calendar, action: () => navigate('/timetable-generator') },
   ];
 
-  if (!user) {
+  if (!user || !profile) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

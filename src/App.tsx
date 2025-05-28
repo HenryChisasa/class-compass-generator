@@ -11,6 +11,7 @@ import Subjects from '@/pages/Subjects';
 import Classes from '@/pages/Classes';
 import Teachers from '@/pages/Teachers';
 import TimetableGenerator from '@/pages/TimetableGenerator';
+import SchoolSelectionPage from '@/pages/SchoolSelectionPage';
 import './App.css';
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/school-selection" element={<SchoolSelectionPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/subjects" element={<Subjects />} />
           <Route path="/classes" element={<Classes />} />
