@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ArrowLeft, Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import Logo from '@/components/Logo';
+import TeacherAvailability from '@/components/TeacherAvailability';
 
 interface Teacher {
   id: string;
@@ -288,6 +289,13 @@ const Teachers = () => {
                       <TableCell>{teacher.phone}</TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
+                          {profile?.school_id && (
+                            <TeacherAvailability
+                              teacherId={teacher.id}
+                              teacherName={teacher.name}
+                              schoolId={profile.school_id}
+                            />
+                          )}
                           <Button
                             variant="outline"
                             size="sm"

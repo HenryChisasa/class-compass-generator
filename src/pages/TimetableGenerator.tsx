@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -7,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Calendar, Play, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import Logo from '@/components/Logo';
+import TimetableGrid from '@/components/TimetableGrid';
 
 interface TimetableData {
   subjects: any[];
@@ -25,6 +24,24 @@ interface UserProfile {
   full_name: string;
 }
 
+interface TeacherAvailability {
+  teacher_id: string;
+  day_of_week: string;
+  start_period: number;
+  end_period: number;
+  is_available: boolean;
+}
+
+interface TimetableSlot {
+  day_of_week: string;
+  period: number;
+  subject_name?: string;
+  subject_color?: string;
+  class_name?: string;
+  teacher_name?: string;
+  classroom_name?: string;
+}
+
 const TimetableGenerator = () => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -36,7 +53,7 @@ const TimetableGenerator = () => {
     teachers: [],
     classrooms: []
   });
-  const [generatedTimetable, setGeneratedTimetable] = useState<any[]>([]);
+  const [generatedTimetable, setGeneratedTimetable] = useState<TimetableSlot[]>([]);
   const [timetableSettings, setTimetableSettings] = useState({
     name: '',
     academic_year: new Date().getFullYear().toString(),
@@ -45,10 +62,10 @@ const TimetableGenerator = () => {
     start_date: '',
     end_date: ''
   });
+  const [teacherAvailability, setTeacherAvailability] = useState<TeacherAvailability[]>([]);
   const navigate = useNavigate();
 
   const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
-  const periods = Array.from({ length: timetableSettings.periods_per_day }, (_, i) => i + 1);
 
   useEffect(() => {
     const getUser = async () => {
@@ -85,11 +102,12 @@ const TimetableGenerator = () => {
 
   const fetchData = async () => {
     try {
-      const [subjectsRes, classesRes, teachersRes, classroomsRes] = await Promise.all([
+      const [subjectsRes, classesRes, teachersRes, classroomsRes, availabilityRes] = await Promise.all([
         supabase.from('subjects').select('*'),
         supabase.from('classes').select('*'),
         supabase.from('teachers').select('*'),
-        supabase.from('classrooms').select('*')
+        supabase.from('classrooms').select('*'),
+        supabase.from('teacher_availability').select('*')
       ]);
 
       setTimetableData({
@@ -98,12 +116,23 @@ const TimetableGenerator = () => {
         teachers: teachersRes.data || [],
         classrooms: classroomsRes.data || []
       });
+
+      setTeacherAvailability(availabilityRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to fetch data');
     } finally {
       setLoading(false);
     }
+  };
+
+  const isTeacherAvailable = (teacherId: string, day: string, period: number): boolean => {
+    const availability = teacherAvailability.find(
+      av => av.teacher_id === teacherId && 
+           av.day_of_week === day && 
+           av.start_period === period
+    );
+    return availability?.is_available ?? true; // Default to available if no record
   };
 
   const generateTimetable = async () => {
@@ -139,79 +168,94 @@ const TimetableGenerator = () => {
 
       if (timetableError) throw timetableError;
 
-      // Simple timetable generation algorithm
-      const slots = [];
-      let subjectIndex = 0;
-      let teacherIndex = 0;
-      let classroomIndex = 0;
+      // Enhanced timetable generation algorithm with teacher availability
+      const slots: TimetableSlot[] = [];
+      const usedSlots = new Set<string>(); // Track used teacher-time combinations
 
       for (const day of days) {
         for (let period = 1; period <= timetableSettings.periods_per_day; period++) {
           for (const classItem of timetableData.classes) {
-            // Create a lesson
-            const lessonDataToInsert = {
-              name: `${timetableData.subjects[subjectIndex % timetableData.subjects.length]?.name || 'Subject'} - ${classItem.name}`,
-              duration_periods: 1,
-              school_id: profile.school_id
-            };
+            // Find an available teacher and subject for this slot
+            let assignedTeacher = null;
+            let assignedSubject = null;
 
-            const { data: lesson, error: lessonError } = await supabase
-              .from('lessons')
-              .insert([lessonDataToInsert])
-              .select()
-              .single();
+            // Try to find an available teacher for this time slot
+            for (const teacher of timetableData.teachers) {
+              const slotKey = `${teacher.id}-${day}-${period}`;
+              
+              if (!usedSlots.has(slotKey) && isTeacherAvailable(teacher.id, day, period)) {
+                assignedTeacher = teacher;
+                usedSlots.add(slotKey);
+                break;
+              }
+            }
 
-            if (lessonError) throw lessonError;
+            // If we found a teacher, assign a subject
+            if (assignedTeacher && timetableData.subjects.length > 0) {
+              assignedSubject = timetableData.subjects[Math.floor(Math.random() * timetableData.subjects.length)];
 
-            // Link lesson to subject, class, and teacher
-            await Promise.all([
-              supabase.from('lesson_subjects').insert([{
+              // Create a lesson
+              const lessonDataToInsert = {
+                name: `${assignedSubject.name} - ${classItem.name}`,
+                duration_periods: 1,
+                school_id: profile.school_id
+              };
+
+              const { data: lesson, error: lessonError } = await supabase
+                .from('lessons')
+                .insert([lessonDataToInsert])
+                .select()
+                .single();
+
+              if (lessonError) throw lessonError;
+
+              // Link lesson to subject, class, and teacher
+              await Promise.all([
+                supabase.from('lesson_subjects').insert([{
+                  lesson_id: lesson.id,
+                  subject_id: assignedSubject.id
+                }]),
+                supabase.from('lesson_classes').insert([{
+                  lesson_id: lesson.id,
+                  class_id: classItem.id
+                }]),
+                supabase.from('lesson_teachers').insert([{
+                  lesson_id: lesson.id,
+                  teacher_id: assignedTeacher.id
+                }])
+              ]);
+
+              // Create timetable slot
+              const slot = {
+                timetable_id: timetable.id,
                 lesson_id: lesson.id,
-                subject_id: timetableData.subjects[subjectIndex % timetableData.subjects.length]?.id
-              }]),
-              supabase.from('lesson_classes').insert([{
-                lesson_id: lesson.id,
-                class_id: classItem.id
-              }]),
-              supabase.from('lesson_teachers').insert([{
-                lesson_id: lesson.id,
-                teacher_id: timetableData.teachers[teacherIndex % timetableData.teachers.length]?.id
-              }])
-            ]);
+                classroom_id: timetableData.classrooms[Math.floor(Math.random() * Math.max(1, timetableData.classrooms.length))]?.id || null,
+                day_of_week: day,
+                period: period
+              };
 
-            // Create timetable slot
-            const slot = {
-              timetable_id: timetable.id,
-              lesson_id: lesson.id,
-              classroom_id: timetableData.classrooms[classroomIndex % Math.max(1, timetableData.classrooms.length)]?.id || null,
-              day_of_week: day,
-              period: period
-            };
+              const { error: slotError } = await supabase
+                .from('timetable_slots')
+                .insert([slot]);
 
-            const { error: slotError } = await supabase
-              .from('timetable_slots')
-              .insert([slot]);
+              if (slotError) throw slotError;
 
-            if (slotError) throw slotError;
-
-            slots.push({
-              ...slot,
-              lesson_name: lesson.name,
-              subject_name: timetableData.subjects[subjectIndex % timetableData.subjects.length]?.name,
-              class_name: classItem.name,
-              teacher_name: timetableData.teachers[teacherIndex % timetableData.teachers.length]?.name,
-              classroom_name: timetableData.classrooms[classroomIndex % Math.max(1, timetableData.classrooms.length)]?.name
-            });
-
-            subjectIndex++;
-            teacherIndex++;
-            classroomIndex++;
+              slots.push({
+                day_of_week: day,
+                period: period,
+                subject_name: assignedSubject.name,
+                subject_color: assignedSubject.color,
+                class_name: classItem.name,
+                teacher_name: assignedTeacher.name,
+                classroom_name: timetableData.classrooms[Math.floor(Math.random() * Math.max(1, timetableData.classrooms.length))]?.name
+              });
+            }
           }
         }
       }
 
       setGeneratedTimetable(slots);
-      toast.success('Timetable generated successfully!');
+      toast.success('Timetable generated successfully with teacher availability considered!');
     } catch (error) {
       console.error('Error generating timetable:', error);
       toast.error('Failed to generate timetable');
@@ -361,52 +405,22 @@ const TimetableGenerator = () => {
           </CardContent>
         </Card>
 
-        {/* Generated Timetable Preview */}
+        {/* Generated Timetable Grid */}
         {generatedTimetable.length > 0 && (
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>Generated Timetable Preview</CardTitle>
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Day</TableHead>
-                      <TableHead>Period</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Class</TableHead>
-                      <TableHead>Teacher</TableHead>
-                      <TableHead>Classroom</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {generatedTimetable.slice(0, 20).map((slot, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="capitalize">{slot.day_of_week}</TableCell>
-                        <TableCell>{slot.period}</TableCell>
-                        <TableCell>{slot.subject_name}</TableCell>
-                        <TableCell>{slot.class_name}</TableCell>
-                        <TableCell>{slot.teacher_name}</TableCell>
-                        <TableCell>{slot.classroom_name || 'TBA'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {generatedTimetable.length > 20 && (
-                  <div className="text-center mt-4 text-gray-500">
-                    Showing first 20 entries of {generatedTimetable.length} total slots
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Generated Timetable</h2>
+              <Button variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+            </div>
+            <TimetableGrid 
+              slots={generatedTimetable}
+              periodsPerDay={timetableSettings.periods_per_day}
+              title="Master Timetable"
+            />
+          </div>
         )}
       </main>
     </div>
