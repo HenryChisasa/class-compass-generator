@@ -10,6 +10,7 @@ import { ArrowLeft, Calendar, Play, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import Logo from '@/components/Logo';
 import TimetableGrid from '@/components/TimetableGrid';
+import type { Database } from '@/integrations/supabase/types';
 
 interface TimetableData {
   subjects: any[];
@@ -24,16 +25,18 @@ interface UserProfile {
   full_name: string;
 }
 
+type DayOfWeek = Database['public']['Enums']['availability_day'];
+
 interface TeacherAvailability {
   teacher_id: string;
-  day_of_week: string;
+  day_of_week: DayOfWeek;
   start_period: number;
   end_period: number;
   is_available: boolean;
 }
 
 interface TimetableSlot {
-  day_of_week: string;
+  day_of_week: DayOfWeek;
   period: number;
   subject_name?: string;
   subject_color?: string;
@@ -65,7 +68,7 @@ const TimetableGenerator = () => {
   const [teacherAvailability, setTeacherAvailability] = useState<TeacherAvailability[]>([]);
   const navigate = useNavigate();
 
-  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
+  const days: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 
   useEffect(() => {
     const getUser = async () => {
@@ -126,7 +129,7 @@ const TimetableGenerator = () => {
     }
   };
 
-  const isTeacherAvailable = (teacherId: string, day: string, period: number): boolean => {
+  const isTeacherAvailable = (teacherId: string, day: DayOfWeek, period: number): boolean => {
     const availability = teacherAvailability.find(
       av => av.teacher_id === teacherId && 
            av.day_of_week === day && 

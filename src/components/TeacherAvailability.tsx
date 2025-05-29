@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check, X, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Database } from '@/integrations/supabase/types';
 
 interface TeacherAvailabilityProps {
   teacherId: string;
@@ -14,9 +15,11 @@ interface TeacherAvailabilityProps {
   periodsPerDay?: number;
 }
 
+type DayOfWeek = Database['public']['Enums']['availability_day'];
+
 interface AvailabilitySlot {
   id?: string;
-  day_of_week: string;
+  day_of_week: DayOfWeek;
   start_period: number;
   end_period: number;
   is_available: boolean;
@@ -33,7 +36,7 @@ const TeacherAvailability: React.FC<TeacherAvailabilityProps> = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+  const days: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
   const periods = Array.from({ length: periodsPerDay }, (_, i) => i + 1);
 
   useEffect(() => {
@@ -82,7 +85,7 @@ const TeacherAvailability: React.FC<TeacherAvailabilityProps> = ({
     }
   };
 
-  const toggleAvailability = (day: string, period: number) => {
+  const toggleAvailability = (day: DayOfWeek, period: number) => {
     setAvailability(prev => 
       prev.map(slot => 
         slot.day_of_week === day && slot.start_period === period
@@ -101,8 +104,8 @@ const TeacherAvailability: React.FC<TeacherAvailabilityProps> = ({
         .delete()
         .eq('teacher_id', teacherId);
 
-      // Insert new availability data
-      const availabilityData = availability.map(slot => ({
+      // Insert new availability data with proper typing
+      const availabilityData: Database['public']['Tables']['teacher_availability']['Insert'][] = availability.map(slot => ({
         teacher_id: teacherId,
         day_of_week: slot.day_of_week,
         start_period: slot.start_period,
@@ -126,7 +129,7 @@ const TeacherAvailability: React.FC<TeacherAvailabilityProps> = ({
     }
   };
 
-  const getSlotAvailability = (day: string, period: number) => {
+  const getSlotAvailability = (day: DayOfWeek, period: number) => {
     return availability.find(
       slot => slot.day_of_week === day && slot.start_period === period
     )?.is_available ?? true;
