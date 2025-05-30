@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -101,10 +100,10 @@ const Dashboard = () => {
   ];
 
   const quickActions = [
+    { label: 'Create Timetable (Guided)', icon: Calendar, action: () => navigate('/create-timetable') },
     { label: 'Add Subject', icon: BookOpen, action: () => navigate('/subjects') },
     { label: 'Add Class', icon: GraduationCap, action: () => navigate('/classes') },
     { label: 'Add Teacher', icon: Users, action: () => navigate('/teachers') },
-    { label: 'Generate Timetable', icon: Calendar, action: () => navigate('/timetable-generator') },
   ];
 
   if (!user || !profile) {

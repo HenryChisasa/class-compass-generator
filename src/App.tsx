@@ -12,6 +12,7 @@ import Classes from '@/pages/Classes';
 import Teachers from '@/pages/Teachers';
 import TimetableGenerator from '@/pages/TimetableGenerator';
 import SchoolSelectionPage from '@/pages/SchoolSelectionPage';
+import TimetableWorkflow from '@/components/TimetableWorkflow';
 import './App.css';
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ function App() {
           <Route path="/auth" element={<Auth />} />
           <Route path="/school-selection" element={<SchoolSelectionPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/create-timetable" element={<TimetableWorkflow />} />
           <Route path="/subjects" element={<Subjects />} />
           <Route path="/classes" element={<Classes />} />
           <Route path="/teachers" element={<Teachers />} />
