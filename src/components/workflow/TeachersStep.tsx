@@ -89,6 +89,28 @@ const TeachersStep: React.FC<TeachersStepProps> = ({ onNext, onPrevious }) => {
     setTeachers(updated);
   };
 
+  const formatPhoneNumber = (phone: string): string => {
+    // Remove all non-digit characters
+    const cleaned = phone.replace(/\D/g, '');
+    
+    // If it starts with 267, return as is with +
+    if (cleaned.startsWith('267')) {
+      return `+${cleaned}`;
+    }
+    
+    // If it's a local number (8 digits), add +267
+    if (cleaned.length === 8) {
+      return `+267${cleaned}`;
+    }
+    
+    // If it already has country code but no +, add it
+    if (cleaned.length > 8 && !phone.startsWith('+')) {
+      return `+${cleaned}`;
+    }
+    
+    return phone;
+  };
+
   const saveTeachers = async () => {
     if (!profile?.school_id) {
       toast.error('No school ID found');
@@ -113,16 +135,40 @@ const TeachersStep: React.FC<TeachersStepProps> = ({ onNext, onPrevious }) => {
       const teachersToInsert = validTeachers.map(teacher => ({
         name: teacher.name,
         email: teacher.email,
-        phone: teacher.phone,
+        phone: formatPhoneNumber(teacher.phone),
         employee_id: teacher.employee_id,
         school_id: profile.school_id
       }));
 
-      const { error } = await supabase
+      const { data: insertedTeachers, error } = await supabase
         .from('teachers')
-        .insert(teachersToInsert);
+        .insert(teachersToInsert)
+        .select();
 
       if (error) throw error;
+
+      // Save WhatsApp numbers for teachers with phone numbers
+      if (insertedTeachers) {
+        const whatsappNumbers = insertedTeachers
+          .filter(teacher => teacher.phone)
+          .map(teacher => ({
+            teacher_id: teacher.id,
+            number: teacher.phone
+          }));
+
+        if (whatsappNumbers.length > 0) {
+          // Delete existing WhatsApp numbers for these teachers
+          await supabase
+            .from('whatsapp_numbers')
+            .delete()
+            .in('teacher_id', insertedTeachers.map(t => t.id));
+
+          // Insert new WhatsApp numbers
+          await supabase
+            .from('whatsapp_numbers')
+            .insert(whatsappNumbers);
+        }
+      }
 
       toast.success(`${validTeachers.length} teachers saved successfully`);
       onNext();
@@ -189,13 +235,16 @@ const TeachersStep: React.FC<TeachersStepProps> = ({ onNext, onPrevious }) => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor={`teacher_phone_${index}`}>Phone Number</Label>
+                  <Label htmlFor={`teacher_phone_${index}`}>Phone Number (WhatsApp)</Label>
                   <Input
                     id={`teacher_phone_${index}`}
                     value={teacher.phone}
                     onChange={(e) => updateTeacher(index, 'phone', e.target.value)}
-                    placeholder="+1 234 567 8900"
+                    placeholder="e.g., 71234567 or +26771234567"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Will automatically add +267 for Botswana numbers
+                  </p>
                 </div>
               </div>
               

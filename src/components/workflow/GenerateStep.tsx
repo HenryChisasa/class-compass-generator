@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, ArrowLeft, Play, Calendar, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Database } from '@/integrations/supabase/types';
+
+type DayOfWeek = Database['public']['Enums']['availability_day'];
 
 interface GenerateStepProps {
   onNext: () => void;
@@ -95,11 +98,11 @@ const GenerateStep: React.FC<GenerateStepProps> = ({ onNext, onPrevious }) => {
       const availability = availabilityData.data || [];
 
       // Simple timetable generation algorithm
-      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      const days: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
       const periodsPerDay = parseInt(localStorage.getItem('periods_per_day') || '8');
       const usedSlots = new Set<string>();
 
-      const isTeacherAvailable = (teacherId: string, day: string, period: number): boolean => {
+      const isTeacherAvailable = (teacherId: string, day: DayOfWeek, period: number): boolean => {
         const teacherAvailability = availability.find(
           av => av.teacher_id === teacherId && 
                av.day_of_week === day && 
